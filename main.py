@@ -120,6 +120,7 @@ def main():
     real_range = REAL_RANGE
     imaginary_range = IMAGINARY_RANGE
     iter_val = get_iter_val(real_range, imaginary_range)
+    old_colors = []
     pixel_colors = get_all_pixel_colors(WIN_WIDTH, WIN_HEIGHT, iter_val, real_range, imaginary_range)
     window_init(window, pixel_colors)
 
@@ -130,12 +131,19 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
+            if event.type == pygame.KEYDOWN and len(old_colors) >= 1:
+                if event.key == pygame.K_u:
+                    pixel_colors = old_colors[-1]
+                    old_colors.pop(len(old_colors)-1)
+                    window_init(window, pixel_colors)
+
             if not button_down and event.type == pygame.MOUSEBUTTONDOWN:
                 first_pos = (pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
                 cursor_rect = pygame.Rect(first_pos, (0, 0))
                 button_down = True
 
             if button_down and event.type == pygame.MOUSEBUTTONUP:
+                old_colors.append(pixel_colors)
                 last_pos = pygame.mouse.get_pos()
                 max_x = max(last_pos[0], first_pos[0])
                 min_x = min(last_pos[0], first_pos[0])
@@ -178,8 +186,8 @@ def main():
     exit()
 
 
-# TODO:
-# add background list of colors from mandel
-
 if __name__ == '__main__':
     main()
+
+# TODO:
+# Add undo button (and redo?)
