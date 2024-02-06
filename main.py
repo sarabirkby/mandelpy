@@ -1,5 +1,5 @@
 import pygame
-import math
+import py2exe
 import os
 
 REAL_RANGE = [-2., 1.]
@@ -16,6 +16,7 @@ THRESHOLD = 2.
 
 NUM_SHADES = 5
 
+BOX_WIDTH = 2
 
 def get_iter_val(real_range: list[float, float], imaginary_range: list[float, float]) -> int:
     real_len = real_range[1] - real_range[0]
@@ -30,7 +31,7 @@ def clear_cursor_rect(win: pygame.Surface, rect: pygame.Rect, colors: list[tuple
     max_win_x = len(colors[0])
     for h in range(y_len):
         for w in range(x_len):
-            if w < 3 or w >= x_len - 3 or h < 3 or h >= y_len - 3:
+            if w < BOX_WIDTH or w >= x_len - BOX_WIDTH or h < BOX_WIDTH or h >= y_len - BOX_WIDTH:
                 x = rect.left + w
                 y = rect.top + h
                 if max_win_x > x >= 0 and max_win_y > y >= 0:
@@ -41,7 +42,7 @@ def print_cursor_rect(win: pygame.Surface, rect: pygame.Rect):
     x_len, y_len = rect.size
     for h in range(y_len):
         for w in range(x_len):
-            if w < 3 or w >= x_len - 3 or h < 3 or h >= y_len - 3:
+            if w < BOX_WIDTH or w >= x_len - BOX_WIDTH or h < BOX_WIDTH or h >= y_len - BOX_WIDTH:
                 win.set_at((rect.left + w, rect.top + h), (255, 255, 255))
 
 
