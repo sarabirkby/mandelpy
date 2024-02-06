@@ -1,5 +1,4 @@
 import pygame
-import py2exe
 import os
 
 REAL_RANGE = [-2., 1.]
@@ -14,7 +13,8 @@ WIN_ORIGIN_Y = 100
 MAX_ITER = 50
 THRESHOLD = 2.
 
-NUM_SHADES = 5
+NUM_SHADES = 20
+COLOR_INTENSITY = 175 * 3
 
 BOX_WIDTH = 2
 
@@ -92,13 +92,13 @@ def get_mandel_color(x: int, y: int, win_width: int, win_height: int, max_iter: 
         return 0, 0, 0
 
     # number of iterations per increase of 1 for each color value (/256)
-    dr = 255 / (NUM_SHADES ** 3)
-    dg = 255 / (NUM_SHADES ** 2)
-    db = 255 / NUM_SHADES
+    dc = 255 / NUM_SHADES
+    current_shade = num_iter % NUM_SHADES
 
-    red: int = int((num_iter % NUM_SHADES ** 3) * dr)
-    green: int = int((num_iter % NUM_SHADES ** 2) * dg)
-    blue: int = int((num_iter % NUM_SHADES) * db)
+    current_color_val = int(current_shade * dc)
+    red: int = 255 - current_color_val
+    green: int = current_color_val*2 if current_color_val < 256//2 else (255-current_color_val)*2
+    blue: int = current_color_val
 
     return red, green, blue
 
