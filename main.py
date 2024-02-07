@@ -18,6 +18,7 @@ COLOR_INTENSITY = 175 * 3
 
 BOX_WIDTH = 2
 
+
 def get_iter_val(real_range: list[float, float], imaginary_range: list[float, float]) -> int:
     real_len = real_range[1] - real_range[0]
     imaginary_len = imaginary_range[1] - imaginary_range[0]
@@ -122,6 +123,7 @@ def main():
     imaginary_range = IMAGINARY_RANGE
     iter_val = get_iter_val(real_range, imaginary_range)
     old_colors = []
+    old_ranges = []
     pixel_colors = get_all_pixel_colors(WIN_WIDTH, WIN_HEIGHT, iter_val, real_range, imaginary_range)
     window_init(window, pixel_colors)
 
@@ -133,18 +135,23 @@ def main():
                 run = False
 
             if event.type == pygame.KEYDOWN and len(old_colors) >= 1:
+                # Undo
                 if event.key == pygame.K_u:
-                    pixel_colors = old_colors[-1]
-                    old_colors.pop(len(old_colors)-1)
+                    pixel_colors = old_colors.pop(-1)
+                    real_range, imaginary_range = old_ranges.pop(-1)
                     window_init(window, pixel_colors)
 
             if not button_down and event.type == pygame.MOUSEBUTTONDOWN:
-                first_pos = (pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
-                cursor_rect = pygame.Rect(first_pos, (0, 0))
                 button_down = True
+                first_pos = pygame.mouse.get_pos()
+                cursor_rect = pygame.Rect(first_pos, (0, 0))
+
 
             if button_down and event.type == pygame.MOUSEBUTTONUP:
+                button_down = False
                 old_colors.append(pixel_colors)
+                old_ranges.append((real_range, imaginary_range))
+
                 last_pos = pygame.mouse.get_pos()
                 max_x = max(last_pos[0], first_pos[0])
                 min_x = min(last_pos[0], first_pos[0])
@@ -165,7 +172,7 @@ def main():
                 pixel_colors = get_all_pixel_colors(WIN_WIDTH, WIN_HEIGHT, iter_val, real_range, imaginary_range)
                 window_init(window, pixel_colors)
 
-                button_down = False
+
 
             if button_down and event.type == pygame.MOUSEMOTION:
                 current_x = pygame.mouse.get_pos()[0]
