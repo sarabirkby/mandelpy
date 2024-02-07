@@ -13,10 +13,10 @@ WIN_ORIGIN_Y = 100
 MAX_ITER = 50
 THRESHOLD = 2.
 
-NUM_SHADES = 20
-COLOR_INTENSITY = 175 * 3
+NUM_SHADES = 18
+COLOR_INTENSITY = 175   # Keep at or below 255!
 
-BOX_WIDTH = 2
+BOX_WIDTH = 2   # Cursor drag box border width in pixels.
 
 
 def get_iter_val(real_range: list[float, float], imaginary_range: list[float, float]) -> int:
@@ -93,12 +93,12 @@ def get_mandel_color(x: int, y: int, win_width: int, win_height: int, max_iter: 
         return 0, 0, 0
 
     # number of iterations per increase of 1 for each color value (/256)
-    dc = 255 / NUM_SHADES
+    dc = COLOR_INTENSITY / NUM_SHADES
     current_shade = num_iter % NUM_SHADES
 
     current_color_val = int(current_shade * dc)
-    red: int = 255 - current_color_val
-    green: int = current_color_val*2 if current_color_val < 256//2 else (255-current_color_val)*2
+    red: int = COLOR_INTENSITY - current_color_val
+    green: int = current_color_val*2 if current_color_val < (COLOR_INTENSITY+1)//2 else (COLOR_INTENSITY-current_color_val)*2
     blue: int = current_color_val
 
     return red, green, blue
@@ -196,6 +196,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-# TODO:
-# Add undo button (and redo?)
