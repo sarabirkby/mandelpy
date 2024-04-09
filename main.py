@@ -1,5 +1,7 @@
 import pygame
 import os
+import math
+import threading
 
 REAL_RANGE = [-2., 1.]
 IMAGINARY_RANGE = [-1., 1.]
@@ -18,11 +20,16 @@ COLOR_INTENSITY = 175   # Keep at or below 255!
 
 BOX_WIDTH = 2   # Cursor drag box border width in pixels.
 
+MIN_SELECTION_SIZE = 10 # Minimum number of pixels a selected box can be
+
+NUM_THREADS = 4
+
 
 def get_iter_val(real_range: list[float, float], imaginary_range: list[float, float]) -> int:
     real_len = real_range[1] - real_range[0]
     imaginary_len = imaginary_range[1] - imaginary_range[0]
-    iter_val = int(100 / real_len * imaginary_len)
+    window_area = real_len * imaginary_len
+    iter_val = 75 + int(1 / window_area) + int(1e-3/window_area**2)
     return iter_val
 
 
@@ -47,15 +54,33 @@ def print_cursor_rect(win: pygame.Surface, rect: pygame.Rect):
                 win.set_at((rect.left + w, rect.top + h), (255, 255, 255))
 
 
+def get_chunk_pixel_colors(chunk, win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
+                           imaginary_range: tuple[float, float], thread_num: int):
+
+    dh = win_height // NUM_THREADS # height of chunk that each thread will compute
+    for h in range(0, dh):
+        y_val = thread_num * dh + h
+        for w in range(win_width):
+            chunk[h][w] = get_mandel_color(w, y_val, win_width, win_height, num_iter, real_range, imaginary_range)
+
+
 def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
                          imaginary_range: tuple[float, float]) -> list[tuple[int, int, int]]:
+    chunks = [None] * NUM_THREADS
+    threads: list[None | threading.Thread] = [None] * NUM_THREADS
+    dh = win_height // NUM_THREADS  # height of chunk that each thread will compute
+    dh_carry = win_height % NUM_THREADS
+    for t in range(NUM_THREADS):
+        chunks[t] = [[None] * win_width] * (dh + dh_carry) if t == NUM_THREADS - 1 else [[None] * win_width] * (dh)
+    for t in range(NUM_THREADS):
+        threads[t] = threading.Thread(target=get_chunk_pixel_colors,
+                                      args=(chunks[t], win_width, win_height, num_iter, real_range, imaginary_range, t))
+        threads[t].start()
+    for thread in threads:
+        thread.join()
     colors = []
-
-    for h in range(win_height):
-        colors.append([])
-        for w in range(win_width):
-            colors[h].append(get_mandel_color(w, h, win_width, win_height, num_iter, real_range, imaginary_range))
-
+    for chunk in chunks:
+        colors += chunk
     return colors
 
 
@@ -86,7 +111,6 @@ def get_mandel_iter_num(c: complex, max_iter: int):
 def get_mandel_color(x: int, y: int, win_width: int, win_height: int, max_iter: int,
                      real_range: tuple[float, float], imaginary_range: tuple[float, float]) -> tuple[int, int, int]:
     # one pixel of change in real
-
     complex_val = get_pixel_complex(x, y, win_width, win_height, real_range, imaginary_range)
     num_iter: int = get_mandel_iter_num(complex_val, max_iter)
     if num_iter == -1:
@@ -152,14 +176,16 @@ def main():
                 old_colors.append(pixel_colors)
                 old_ranges.append((real_range, imaginary_range))
 
-                last_pos = pygame.mouse.get_pos()
-                max_x = max(last_pos[0], first_pos[0])
-                min_x = min(last_pos[0], first_pos[0])
-                max_y = max(last_pos[1], first_pos[1])
-                min_y = min(last_pos[1], first_pos[1])
+                current_x = pygame.mouse.get_pos()[0]
+                current_y = pygame.mouse.get_pos()[1]
 
-                min_val: complex = get_pixel_complex(min_x, min_y, WIN_WIDTH, WIN_HEIGHT, real_range, imaginary_range)
-                max_val: complex = get_pixel_complex(max_x, max_y, WIN_WIDTH, WIN_HEIGHT, real_range, imaginary_range)
+                x_min = max(min(current_x, first_pos[0]), 0)
+                x_max = min(max(current_x, first_pos[0], x_min+MIN_SELECTION_SIZE), window.get_width())
+                y_min = max(min(current_y, first_pos[1]), 0)
+                y_max = min(max(current_y, first_pos[1], x_min+MIN_SELECTION_SIZE), window.get_height())
+
+                min_val: complex = get_pixel_complex(x_min, y_min, WIN_WIDTH, WIN_HEIGHT, real_range, imaginary_range)
+                max_val: complex = get_pixel_complex(x_max, y_max, WIN_WIDTH, WIN_HEIGHT, real_range, imaginary_range)
 
                 real_range = [min_val.real, max_val.real]
                 imaginary_range = [max_val.imag, min_val.imag]
@@ -178,10 +204,10 @@ def main():
                 current_x = pygame.mouse.get_pos()[0]
                 current_y = pygame.mouse.get_pos()[1]
                 clear_cursor_rect(window, cursor_rect, pixel_colors)
-                x_min = min((current_x, first_pos[0]))
-                x_max = max((current_x, first_pos[0]))
-                y_min = min((current_y, first_pos[1]))
-                y_max = max((current_y, first_pos[1]))
+                x_min = max(min(current_x, first_pos[0]), 0)
+                x_max = min(max(current_x, first_pos[0]), window.get_width())
+                y_min = max(min(current_y, first_pos[1]), 0)
+                y_max = min(max(current_y, first_pos[1]), window.get_height())
                 x_len = x_max - x_min
                 y_len = y_max - y_min
                 cursor_rect = pygame.Rect((x_min, y_min), (x_len, y_len))
