@@ -1,6 +1,6 @@
 import pygame
 import os
-import threading
+from threading import *
 import time
 
 REAL_RANGE: tuple[float, float] = (-2., 1.)
@@ -26,7 +26,7 @@ def time_test(func):
     def wrapper(*args):
         start = time.time()
         retval = func(*args)
-        print(f'Time elapsed: {(time.time() - start)} s')
+        print(f'Time elapsed: {(time.time() - start):.4f}s')
         return retval
 
     return wrapper
@@ -62,9 +62,8 @@ def print_cursor_rect(win: pygame.Surface, rect: pygame.Rect):
 
 
 def get_chunk_pixel_colors(chunk, win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
-                           imaginary_range: tuple[float, float], thread_num: int):
-    dh = win_height // NUM_THREADS  # height of chunk that each thread will compute
-    for h in range(0, dh):
+                           imaginary_range: tuple[float, float], thread_num: int, dh: int, dh_carry: int):
+    for h in range(0, dh + dh_carry):
         y_val = thread_num * dh + h
         for w in range(win_width):
             chunk[h][w] = get_mandel_color(w, y_val, win_width, win_height, num_iter, real_range, imaginary_range)
@@ -73,15 +72,20 @@ def get_chunk_pixel_colors(chunk, win_width: int, win_height: int, num_iter: int
 @time_test
 def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
                          imaginary_range: tuple[float, float]) -> list[tuple[int, int, int]]:
-    chunks = [None] * NUM_THREADS
-    threads: list[None | threading.Thread] = [None] * NUM_THREADS
+    chunks: list[None | list] = [None] * NUM_THREADS
+    threads: list[None | Thread] = [None] * NUM_THREADS
     dh = win_height // NUM_THREADS  # height of chunk that each thread will compute
     dh_carry = win_height % NUM_THREADS
 
     for t in range(NUM_THREADS):
-        chunks[t] = [[None] * win_width] * (dh + dh_carry) if t == NUM_THREADS - 1 else [[None] * win_width] * dh
-        threads[t] = threading.Thread(target=get_chunk_pixel_colors,
-                                      args=(chunks[t], win_width, win_height, num_iter, real_range, imaginary_range, t))
+        if t == NUM_THREADS - 1:
+            chunks[t] = [[None] * win_width] * (dh + dh_carry)
+            threads[t] = Thread(target=get_chunk_pixel_colors, args=(chunks[t], win_width, win_height, num_iter,
+                                                                     real_range, imaginary_range, t, dh, dh_carry))
+        else:
+            chunks[t] = [[None] * win_width] * dh
+            threads[t] = Thread(target=get_chunk_pixel_colors, args=(chunks[t], win_width, win_height, num_iter,
+                                                                     real_range, imaginary_range, t, dh, 0))
         threads[t].start()
     for thread in threads:
         thread.join()
@@ -139,7 +143,7 @@ def get_mandel_color(x: int, y: int, win_width: int, win_height: int, max_iter: 
     return red, green, blue
 
 
-def window_init(win, colors):
+def window_init(win, colors: list[list[tuple[int, int, int]]]):
     win.fill(0)
 
     rect = pygame.Rect(win.get_rect().center, (0, 0)).inflate(WIN_WIDTH, WIN_HEIGHT)
