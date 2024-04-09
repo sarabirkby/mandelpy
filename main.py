@@ -130,8 +130,10 @@ def get_mandel_color(x: int, y: int, win_width: int, win_height: int, max_iter: 
 
     current_color_val = int(current_shade * dc)
     red: int = COLOR_INTENSITY - current_color_val
-    green: int = current_color_val * 2 if current_color_val < (COLOR_INTENSITY + 1) // 2 else (
-                                                                                                          COLOR_INTENSITY - current_color_val) * 2
+    if current_color_val < (COLOR_INTENSITY + 1) // 2:
+        green: int = current_color_val * 2
+    else:
+        green: int = (COLOR_INTENSITY - current_color_val) * 2
     blue: int = current_color_val
 
     return red, green, blue
