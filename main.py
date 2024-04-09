@@ -2,6 +2,7 @@ import pygame
 import os
 import math
 import threading
+import time
 
 REAL_RANGE = [-2., 1.]
 IMAGINARY_RANGE = [-1., 1.]
@@ -22,8 +23,15 @@ BOX_WIDTH = 2   # Cursor drag box border width in pixels.
 
 MIN_SELECTION_SIZE = 10 # Minimum number of pixels a selected box can be
 
-NUM_THREADS = 4
+NUM_THREADS = 8
 
+def time_test(func):
+    def wrapper(*args):
+        start = time.time()
+        retval = func(*args)
+        print(f'Time elapsed: {(time.time() - start)} s')
+        return retval
+    return wrapper
 
 def get_iter_val(real_range: list[float, float], imaginary_range: list[float, float]) -> int:
     real_len = real_range[1] - real_range[0]
@@ -64,6 +72,7 @@ def get_chunk_pixel_colors(chunk, win_width: int, win_height: int, num_iter: int
             chunk[h][w] = get_mandel_color(w, y_val, win_width, win_height, num_iter, real_range, imaginary_range)
 
 
+@time_test
 def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
                          imaginary_range: tuple[float, float]) -> list[tuple[int, int, int]]:
     chunks = [None] * NUM_THREADS
@@ -71,8 +80,7 @@ def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_ra
     dh = win_height // NUM_THREADS  # height of chunk that each thread will compute
     dh_carry = win_height % NUM_THREADS
     for t in range(NUM_THREADS):
-        chunks[t] = [[None] * win_width] * (dh + dh_carry) if t == NUM_THREADS - 1 else [[None] * win_width] * (dh)
-    for t in range(NUM_THREADS):
+        chunks[t] = [[None] * win_width] * (dh + dh_carry) if t == NUM_THREADS - 1 else [[None] * win_width] * dh
         threads[t] = threading.Thread(target=get_chunk_pixel_colors,
                                       args=(chunks[t], win_width, win_height, num_iter, real_range, imaginary_range, t))
         threads[t].start()
