@@ -1,25 +1,25 @@
 import pygame
-import os
 from threading import *
 import time
+
+NUM_THREADS = 1
 
 REAL_RANGE: tuple[float, float] = (-2., 1.)
 IMAGINARY_RANGE: tuple[float, float] = (-1., 1.)
 
 WIN_WIDTH: int = 1000
 WIN_HEIGHT: int = 700
+WIN_HEIGHT -= WIN_HEIGHT % NUM_THREADS  # Makes height divisible by the number of threads
 
-MAX_ITER = 50
-THRESHOLD = 2.
+MAX_ITER: int = 50
+THRESHOLD: float = 2.  # The magnitude where a certain pixel is known to not be a part of the set.
 
-NUM_SHADES = 18
-COLOR_INTENSITY = 175  # Keep at or below 255!
+NUM_SHADES: int = 18
+COLOR_INTENSITY: int = 175  # Keep at or below 255!
 
-BOX_WIDTH = 2  # Cursor drag box border width in pixels.
+BOX_WIDTH: int = 2  # Cursor drag box border width in pixels.
 
-MIN_SELECTION_SIZE = 10  # Minimum number of pixels a selected box can be
-
-NUM_THREADS = 8
+MIN_SELECTION_SIZE: int = 10  # Minimum number of pixels a selected box can be
 
 
 def time_test(func):
@@ -61,12 +61,15 @@ def print_cursor_rect(win: pygame.Surface, rect: pygame.Rect):
                 win.set_at((rect.left + w, rect.top + h), (255, 255, 255))
 
 
-def get_chunk_pixel_colors(chunk, win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
+def get_chunk_pixel_colors(chunk: list, win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
                            imaginary_range: tuple[float, float], thread_num: int, dh: int, dh_carry: int):
     for h in range(0, dh + dh_carry):
         y_val = thread_num * dh + h
         for w in range(win_width):
-            chunk[h][w] = get_mandel_color(w, y_val, win_width, win_height, num_iter, real_range, imaginary_range)
+            colors = get_mandel_color(w, y_val, win_width, win_height, num_iter, real_range, imaginary_range)
+            chunk[h][w] = colors
+            # The above line is, if not the cause of error, where it becomes apparent.
+            # For some reason, instead of just modifying the h-th sublist, it modifies ALL sublists. What's with that!?
 
 
 @time_test
@@ -82,6 +85,7 @@ def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_ra
             chunks[t] = [[None] * win_width] * (dh + dh_carry)
             threads[t] = Thread(target=get_chunk_pixel_colors, args=(chunks[t], win_width, win_height, num_iter,
                                                                      real_range, imaginary_range, t, dh, dh_carry))
+
         else:
             chunks[t] = [[None] * win_width] * dh
             threads[t] = Thread(target=get_chunk_pixel_colors, args=(chunks[t], win_width, win_height, num_iter,
@@ -139,7 +143,6 @@ def get_mandel_color(x: int, y: int, win_width: int, win_height: int, max_iter: 
     else:
         green: int = (COLOR_INTENSITY - current_color_val) * 2
     blue: int = current_color_val
-
     return red, green, blue
 
 
@@ -223,7 +226,6 @@ def main():
                 y_len = y_max - y_min
                 cursor_rect = pygame.Rect((x_min, y_min), (x_len, y_len))
                 print_cursor_rect(window, cursor_rect)
-                button_down = True
 
         pygame.display.flip()
 

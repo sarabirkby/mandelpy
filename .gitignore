@@ -3,3 +3,4 @@ dist/main.exe
 build/lib/main.py
 setup.py
 .idea
+test.py
