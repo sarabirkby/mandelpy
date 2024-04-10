@@ -61,20 +61,20 @@ def print_cursor_rect(win: pygame.Surface, rect: pygame.Rect):
                 win.set_at((rect.left + w, rect.top + h), (255, 255, 255))
 
 
-def get_chunk_pixel_colors(chunk: list, win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
-                           imaginary_range: tuple[float, float], thread_num: int, dh: int, dh_carry: int):
+def get_chunk_pixel_colors(chunk: list[list[tuple[int, int, int]]], win_width: int, win_height: int,
+                           num_iter: int, real_range: tuple[float, float], imaginary_range: tuple[float, float],
+                           thread_num: int, dh: int, dh_carry: int):
     for h in range(0, dh + dh_carry):
         y_val = thread_num * dh + h
         for w in range(win_width):
-            colors = get_mandel_color(w, y_val, win_width, win_height, num_iter, real_range, imaginary_range)
-            chunk[h][w] = colors
+            chunk[h][w] = get_mandel_color(w, y_val, win_width, win_height, num_iter, real_range, imaginary_range)
             # The above line is, if not the cause of error, where it becomes apparent.
             # For some reason, instead of just modifying the h-th sublist, it modifies ALL sublists. What's with that!?
 
 
 @time_test
 def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
-                         imaginary_range: tuple[float, float]) -> list[tuple[int, int, int]]:
+                         imaginary_range: tuple[float, float]) -> list[list[tuple[int, int, int]]]:
     chunks: list[None | list] = [None] * NUM_THREADS
     threads: list[None | Thread] = [None] * NUM_THREADS
     dh = win_height // NUM_THREADS  # height of chunk that each thread will compute
