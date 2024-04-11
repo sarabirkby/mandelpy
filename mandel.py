@@ -2,7 +2,9 @@ import pygame
 from threading import *
 import time
 
-NUM_THREADS = 2
+THREAD_DEBUG = True
+
+NUM_THREADS = 8
 
 REAL_RANGE: tuple[float, float] = (-2., 1.)
 IMAGINARY_RANGE: tuple[float, float] = (-1., 1.)
@@ -22,7 +24,7 @@ BOX_WIDTH: int = 2  # Cursor drag box border width in pixels.
 MIN_SELECTION_SIZE: int = 10  # Minimum number of pixels a selected box can be
 
 
-def time_test(func):
+def time_checker(func):
     def wrapper(*args):
         start = time.time()
         retval = func(*args)
@@ -73,11 +75,14 @@ def get_chunk_pixel_colors(chunk: list, win_width: int, win_height: int,
             # For some reason, instead of just modifying the h-th sublist, it modifies ALL sublists. What's with that!?
 
 
-@time_test
+@time_checker
 def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
                          imaginary_range: tuple[float, float]) -> list[list[tuple[int, int, int]]]:
     chunks: list[None | list] = [None] * NUM_THREADS
     threads: list[None | Thread] = [None] * NUM_THREADS
+    if THREAD_DEBUG:
+        start_times = list()
+        end_times = list()
     dh = win_height // NUM_THREADS  # height of chunk that each thread will compute
     dh_carry = win_height % NUM_THREADS
 
@@ -85,15 +90,32 @@ def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_ra
         if t == NUM_THREADS - 1:
             chunks[t] = list()
             threads[t] = Thread(target=get_chunk_pixel_colors, args=(chunks[t], win_width, win_height, num_iter,
-                                                                     real_range, imaginary_range, t, dh, dh_carry))
+                                                                      real_range, imaginary_range, t, dh, dh_carry))
 
         else:
             chunks[t] = list()
             threads[t] = Thread(target=get_chunk_pixel_colors, args=(chunks[t], win_width, win_height, num_iter,
-                                                                     real_range, imaginary_range, t, dh, 0))
+                                                                      real_range, imaginary_range, t, dh, 0))
         threads[t].start()
-    for thread in threads:
-        thread.join()
+        if THREAD_DEBUG:
+            start_times.append(time.time())
+
+    if THREAD_DEBUG:
+        dead_threads = list()
+        while True:
+            for t in range(len(threads)):
+                if t in dead_threads:
+                    continue
+                elif not threads[t].is_alive():
+                    end_times.append(time.time())
+                    dead_threads.append(t)
+                else:
+                    break
+            else:
+                break
+
+        for i in range(len(threads)):
+            print(f'Thread {i}: {end_times[i]-start_times[i]:.4f}s')
 
     colors = []
     for chunk in chunks:
