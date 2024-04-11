@@ -1,16 +1,18 @@
 import pygame
-from threading import *
+import concurrent.futures as cf
 import time
+import numpy as np
+from numpy import ndarray
 
-THREAD_DEBUG = True
+THREAD_DEBUG = False
 
 NUM_THREADS = 8
 
 REAL_RANGE: tuple[float, float] = (-2., 1.)
 IMAGINARY_RANGE: tuple[float, float] = (-1., 1.)
 
-WIN_WIDTH: int = 1000
-WIN_HEIGHT: int = 700
+WIN_WIDTH: int = 800
+WIN_HEIGHT: int = 600
 WIN_HEIGHT -= WIN_HEIGHT % NUM_THREADS  # Makes height divisible by the number of threads
 
 MAX_ITER: int = 50
@@ -22,6 +24,12 @@ COLOR_INTENSITY: int = 175  # Keep at or below 255!
 BOX_WIDTH: int = 2  # Cursor drag box border width in pixels.
 
 MIN_SELECTION_SIZE: int = 10  # Minimum number of pixels a selected box can be
+
+class Pixel:
+    def __init__(self, color: np.array, x: int, y: int):
+        self.color = color
+        self.x = x
+        self.y = y
 
 
 def time_checker(func):
@@ -63,63 +71,36 @@ def print_cursor_rect(win: pygame.Surface, rect: pygame.Rect):
                 win.set_at((rect.left + w, rect.top + h), (255, 255, 255))
 
 
-def get_chunk_pixel_colors(chunk: list, win_width: int, win_height: int,
-                           num_iter: int, real_range: tuple[float, float], imaginary_range: tuple[float, float],
-                           thread_num: int, dh: int, dh_carry: int):
-    for h in range(0, dh + dh_carry):
-        y_val = thread_num * dh + h
-        chunk.append([])
-        for w in range(win_width):
-            chunk[h].append(get_mandel_color(w, y_val, win_width, win_height, num_iter, real_range, imaginary_range))
-            # The above line is, if not the cause of error, where it becomes apparent.
-            # For some reason, instead of just modifying the h-th sublist, it modifies ALL sublists. What's with that!?
+def add_pixel_to_array(colors: ndarray, x: int, y: int, win_width: int, win_height: int, max_iter: int,
+                       real_range: tuple[float, float], imaginary_range: tuple[float, float]):
+    rgb = get_mandel_color(x, y, win_width, win_height, max_iter, real_range, imaginary_range)
+    colors[y][x][0] = rgb[0]
+    colors[y][x][1] = rgb[1]
+    colors[y][x][2] = rgb[2]
 
 
 @time_checker
 def get_all_pixel_colors(win_width: int, win_height: int, num_iter: int, real_range: tuple[float, float],
-                         imaginary_range: tuple[float, float]) -> list[list[tuple[int, int, int]]]:
-    chunks: list[None | list] = [None] * NUM_THREADS
-    threads: list[None | Thread] = [None] * NUM_THREADS
-    if THREAD_DEBUG:
-        start_times = list()
-        end_times = list()
-    dh = win_height // NUM_THREADS  # height of chunk that each thread will compute
-    dh_carry = win_height % NUM_THREADS
+                         imaginary_range: tuple[float, float]) -> ndarray:
 
-    for t in range(NUM_THREADS):
-        if t == NUM_THREADS - 1:
-            chunks[t] = list()
-            threads[t] = Thread(target=get_chunk_pixel_colors, args=(chunks[t], win_width, win_height, num_iter,
-                                                                      real_range, imaginary_range, t, dh, dh_carry))
+    colors = np.zeros((win_height, win_width, 3), dtype=np.uint8)
 
-        else:
-            chunks[t] = list()
-            threads[t] = Thread(target=get_chunk_pixel_colors, args=(chunks[t], win_width, win_height, num_iter,
-                                                                      real_range, imaginary_range, t, dh, 0))
-        threads[t].start()
-        if THREAD_DEBUG:
-            start_times.append(time.time())
+    with cf.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
 
-    if THREAD_DEBUG:
-        dead_threads = list()
-        while True:
-            for t in range(len(threads)):
-                if t in dead_threads:
-                    continue
-                elif not threads[t].is_alive():
-                    end_times.append(time.time())
-                    dead_threads.append(t)
-                else:
-                    break
-            else:
-                break
+        total_pixels = win_width * win_height
+        ys = [val // win_width for val in range(total_pixels)]
+        xs = [val % win_width for val in range(total_pixels)]
+        start = time.time()
+        pixels = executor.map(get_mandel_color, xs, ys, [win_width] * total_pixels, [win_height] * total_pixels,
+                               [num_iter] * total_pixels, [real_range] * total_pixels, [imaginary_range] * total_pixels)
+        print(f'{time.time() - start:.4f}')
+        for pixel in pixels:
+            colors[pixel.y][pixel.x] = pixel.color
 
-        for i in range(len(threads)):
-            print(f'Thread {i}: {end_times[i]-start_times[i]:.4f}s')
 
-    colors = []
-    for chunk in chunks:
-        colors += chunk
+
+
+
     return colors
 
 
@@ -148,12 +129,11 @@ def get_mandel_iter_num(c: complex, max_iter: int):
 
 
 def get_mandel_color(x: int, y: int, win_width: int, win_height: int, max_iter: int,
-                     real_range: tuple[float, float], imaginary_range: tuple[float, float]) -> tuple[int, int, int]:
-    # one pixel of change in real
+                     real_range: tuple[float, float], imaginary_range: tuple[float, float]) -> Pixel:
     complex_val = get_pixel_complex(x, y, win_width, win_height, real_range, imaginary_range)
     num_iter: int = get_mandel_iter_num(complex_val, max_iter)
     if num_iter == -1:
-        return 0, 0, 0
+        return Pixel(np.array([0, 0, 0], dtype=np.uint8), x, y)
 
     # number of iterations per increase of 1 for each color value (/256)
     dc = COLOR_INTENSITY / NUM_SHADES
@@ -166,7 +146,7 @@ def get_mandel_color(x: int, y: int, win_width: int, win_height: int, max_iter: 
     else:
         green: int = (COLOR_INTENSITY - current_color_val) * 2
     blue: int = current_color_val
-    return red, green, blue
+    return Pixel(np.array([red, green, blue], dtype=np.uint8), x, y)
 
 
 def window_init(win, colors: list[list[tuple[int, int, int]]]):
